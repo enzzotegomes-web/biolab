@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>BioLab Dynamics</title>
+    <link rel="stylesheet" href="style.css">
+     <link rel="icon" href="imagens/logo1.png">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+      .account-area{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0}
+      .auth-backdrop{position:fixed;inset:0;background:#10251dcc;display:none;align-items:center;justify-content:center;padding:18px;z-index:9999}
+      .auth-backdrop.show{display:flex}.auth-panel{background:#fff;color:#20352a;width:min(100%,430px);padding:24px;border-radius:16px;box-shadow:0 18px 60px #0005}
+      .auth-panel input{display:block;width:100%;box-sizing:border-box;padding:12px;margin:8px 0 14px;border:1px solid #cbd5ce;border-radius:8px;font:inherit}
+      .auth-panel button{margin:5px 5px 5px 0}.auth-message{font-size:14px;min-height:20px;color:#8a3b20}.auth-message.good{color:#16713a}
+      .muted{opacity:.75;font-size:13px}.save-status{font-size:13px;margin-top:8px}
+    </style>
+</head>
+
+<body>
+    <header>
+    <a href="index.html" class="brand">
+        <img src="imagens/logo1.png" alt="BioLab Dynamics" class="logo" onerror="this.style.display='none'">
+        <b>BioLab Dynamics</b>
+    </a>
+        <nav id="nav"></nav>
+    </header>
+    <main id="m"></main>
+    <div id="authModal" class="auth-backdrop" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+      <section class="auth-panel">
+        <h2 id="authTitle">Entre no BioLab Dynamics</h2>
+        <p id="authIntro">Crie sua conta ou entre para salvar seu progresso na nuvem.</p>
+        <form id="authForm">
+          <label id="nameLabel" for="authName">Seu nome</label>
+          <input id="authName" type="text" autocomplete="name" placeholder="Como devemos chamar você?">
+          <label for="authEmail">E-mail</label>
+          <input id="authEmail" type="email" autocomplete="email" required placeholder="seu@email.com">
+          <label for="authPassword">Senha</label>
+          <input id="authPassword" type="password" autocomplete="current-password" minlength="6" required placeholder="Mínimo de 6 caracteres">
+          <p id="authMessage" class="auth-message" aria-live="polite"></p>
+          <button id="authSubmit" type="submit">Entrar</button>
+          <button id="authSwitch" class="o" type="button">Criar uma conta</button>
+          <button class="o" type="button" onclick="closeAuth()">Fechar</button>
+        </form>
+        <p class="muted">Se o cadastro exigir confirmação, verifique sua caixa de entrada.</p>
+      </section>
+    </div>
+    <script>
+        const Q = [
+            ["Anatomia", "f", "Qual tecido vegetal conduz principalmente água e sais minerais das raízes às folhas?", ["Xilema", "Floema", "Colênquima", "Epiderme"], 0, "O xilema transporta a seiva bruta (água e sais minerais). O floema transporta a seiva elaborada, rica em açúcares.", "Os vasos do xilema maduro são células mortas."],
+            ["Anatomia", "f", "Que estruturas controlam as trocas gasosas e a perda de água nas folhas?", ["Estômatos", "Lenticelas de raiz", "Pelos radiculares", "Hidatódios"], 0, "Os estômatos são poros delimitados por duas células-guarda, que regulam a entrada de CO₂ e a saída de vapor d'água.", "Em muitas plantas os estômatos abrem de dia e fecham à noite; plantas CAM fazem o oposto."],
+            ["Anatomia", "m", "Qual tecido é formado por células com paredes secundárias lignificadas e função principal de sustentação?", ["Esclerênquima", "Parênquima", "Meristema apical", "Floema"], 0, "O esclerênquima tem paredes espessas e lignificadas e, quando maduro, geralmente sem protoplasto vivo, dando resistência mecânica.", "As fibras do linho e do cânhamo são esclerênquima."],
+            ["Anatomia", "m", "Qual tecido é vivo, com paredes primárias espessadas de modo desigual, e sustenta órgãos jovens em crescimento?", ["Colênquima", "Esclerênquima", "Xilema", "Súber"], 0, "O colênquima tem paredes primárias espessadas (celulose e pectina) e é flexível, apropriado para órgãos ainda em alongamento.", "Os 'fios' de um talo de salsão são em grande parte colênquima."],
+            ["Anatomia", "f", "Onde ficam as células meristemáticas responsáveis pelo crescimento em comprimento?", ["Nos ápices de caule e raiz", "Nas folhas maduras", "Na epiderme", "No córtex da raiz madura"], 0, "Os meristemas apicais ficam nas extremidades do caule e da raiz e produzem o crescimento primário.", "O crescimento em espessura vem dos meristemas laterais: câmbio vascular e felogênio."],
+            ["Morfologia", "f", "Plantas com folhas de nervação paralela, flores trímeras e um cotilédone pertencem às:", ["Monocotiledôneas", "Eudicotiledôneas", "Gimnospermas", "Briófitas"], 0, "Monocotiledôneas, como gramíneas, palmeiras e orquídeas, têm nervação paralela, flores em múltiplos de três e um cotilédone.", "Eudicotiledôneas têm em geral nervação reticulada e flores tetrâmeras ou pentâmeras."],
+            ["Morfologia", "m", "A raiz do milho é fasciculada. O que isso significa?", ["Muitas raízes finas de tamanho semelhante, sem raiz principal dominante", "Uma raiz principal grossa com ramificações", "Raiz que cresce acima do solo", "Raiz com haustórios"], 0, "Raiz fasciculada (em cabeleira) é típica de monocotiledôneas; a raiz primária tem vida curta e é substituída por raízes adventícias.", "A raiz pivotante (axial) é típica das eudicotiledôneas."],
+            ["Morfologia", "m", "O fruto do tipo drupa se caracteriza por:", ["Endocarpo endurecido envolvendo a semente (caroço)", "Ser sempre seco e deiscente", "Derivar de vários ovários", "Não ter semente"], 0, "Na drupa (pêssego, manga, azeitona) o endocarpo é lenhoso e forma o caroço, que protege a semente.", "A amêndoa que comemos é a semente dentro do caroço."],
+            ["Sistemática", "f", "Qual grupo de plantas NÃO possui vasos condutores?", ["Briófitas", "Samambaias", "Gimnospermas", "Angiospermas"], 0, "Briófitas (musgos, hepáticas e antóceros) são avasculares. Samambaias, gimnospermas e angiospermas têm xilema e floema.", "Por não terem vasos, briófitas dependem de ambientes úmidos e têm porte pequeno."],
+            ["Sistemática", "m", "Qual característica é exclusiva das angiospermas?", ["Sementes protegidas dentro de frutos", "Presença de sementes", "Presença de xilema", "Embrião multicelular"], 0, "Angiospermas formam flores e frutos; as sementes se desenvolvem dentro do ovário. Gimnospermas têm sementes expostas.", "A dupla fecundação com formação de endosperma também é característica de angiospermas."],
+            ["Sistemática", "m", "Em 'Araucaria angustifolia', 'angustifolia' indica:", ["O epíteto específico", "O gênero", "A família", "A classe"], 0, "A nomenclatura binomial é formada por gênero (Araucaria, maiúscula) e epíteto específico (angustifolia, minúscula), em itálico.", "'Angustifolia' significa 'folha estreita' em latim."],
+            ["Sistemática", "m", "Samambaias e avencas pertencem ao grupo das:", ["Monilófitas", "Briófitas", "Gimnospermas", "Angiospermas"], 0, "Samambaias e afins são monilófitas, plantas vasculares sem sementes que se reproduzem por esporos.", "Têm ciclo de vida com gametófito (prótalo) e esporófito independentes."],
+            ["Biodiversidade", "f", "Qual bioma brasileiro é o único exclusivamente brasileiro?", ["Caatinga", "Amazônia", "Cerrado", "Pantanal"], 0, "A Caatinga ocorre apenas no Brasil, predominantemente no Nordeste, e tem muitas espécies endêmicas.", "Amazônia, Cerrado e Pantanal se estendem a outros países."],
+            ["Biodiversidade", "f", "O pau-brasil (Paubrasilia echinata) é característico de qual bioma?", ["Mata Atlântica", "Pampa", "Pantanal", "Caatinga"], 0, "O pau-brasil é nativo da Mata Atlântica e foi intensamente explorado desde o período colonial, sendo hoje ameaçado.", "O nome do país deriva da madeira, que fornecia corante vermelho."],
+            ["Biodiversidade", "m", "O que é uma espécie endêmica?", ["Ocorre naturalmente apenas em determinada região", "Foi introduzida por humanos", "Está extinta", "É cultivada"], 0, "Espécie endêmica tem distribuição natural restrita a uma área definida, como um bioma ou ilha.", "Endemismo é um critério importante para priorizar áreas de conservação."]
+        ];
+        const TF = [
+            ["O floema transporta principalmente a seiva elaborada.", true, "Correto: o floema distribui açúcares produzidos na fotossíntese."],
+            ["Gimnospermas produzem frutos verdadeiros.", false, "Falso: suas sementes ficam expostas; o fruto é característico de angiospermas."],
+            ["Musgos possuem raízes verdadeiras.", false, "Falso: briófitas têm rizoides, sem tecidos vasculares."],
+            ["Os estômatos são formados por duas células-guarda.", true, "Correto, na maioria das plantas; elas regulam a abertura do poro."],
+            ["O Cerrado é um bioma exclusivamente da região Sul do Brasil.", false, "Falso: ocupa principalmente o Brasil Central."]];
+        const LV = [[0, "Explorador da Natureza"], [500, "Aprendiz Botânico"], [1500, "Pesquisador Vegetal"], [3000, "Especialista em Botânica"], [5000, "Mestre da Biodiversidade"]];
+        const lvl = p => LV.filter(l => p >= l[0]).pop()[1];
+        // Supabase: URL e chave pública (publishable). A segurança vem das políticas RLS.
+        const SUPABASE_URL = "https://rxrfrfarpbbdxpheandk.supabase.co";
+        const SUPABASE_ANON_KEY = "sb_publishable_Mz0Jy5widdEWTNCl93fURA_MCnCn2T3";
+        let db = null, user = null, uid = null, authMode = "login";
+        let me = {points: 0, answered: 0, correct: 0, fav: [], display_name: "Jogador"};
+        let S = null, tab = "home", ts = 0, tmr = null;
+        const $ = id => document.getElementById(id); const sh = a => [...a].sort(() => Math.random() - .5);
+        function nav() {
+            const links = [["home", "Início"], ["quiz", "Quiz"], ["tf", "V ou F"], ["rush", "Relâmpago"], ["herb", "Herbário"], ["rank", "Ranking"]];
+            $("nav").innerHTML = links.map(t => `<button class="${tab == t[0] ? "on" : ""}" onclick="go('${t[0]}')">${t[1]}</button>`).join("");
+            const account = document.createElement("div"); account.className = "account-area";
+            account.innerHTML = user
+              ? `<span>Olá, <b>${escapeHtml(me.display_name || user.email || "Jogador")}</b></span><button class="o" onclick="logout()">Sair</button>`
+              : `<button class="o" onclick="openAuth('login')">Entrar / Cadastrar</button>`;
+            $("nav").appendChild(account);
+        }
+        function escapeHtml(v) { return String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;", "'":"&#39;"}[c])); }
+        function go(t) {
+            clearInterval(tmr);
+            if (["quiz", "rush", "tf"].includes(t) && !user) { openAuth("login", "Entre ou crie uma conta para jogar e salvar seu progresso."); return; }
+            tab = t; nav(); if (t == "quiz" || t == "rush") start(t); else if (t == "tf") start("tf"); else render();
+        }
+        // A aba "herb" é desenhada pelo herbario.js (que substitui render()).
+        function render() {
+            const m = $("m");
+            if (tab == "home") m.innerHTML = `<div class="card"><h2>Aprenda botânica jogando</h2><p>Quiz, verdadeiro ou falso e desafio relâmpago sobre anatomia, morfologia, sistemática e biodiversidade, com explicação após cada resposta.</p>
+ <button onclick="go('quiz')">Começar a jogar</button> <button class="o" onclick="go('herb')">Conheça a biodiversidade</button></div>
+ <div class="card"><h3>Seu progresso</h3><p>${me.points} pontos · ${me.answered} respondidas · ${me.answered ? Math.round(100 * me.correct / me.answered) : 0}% de acerto</p><p><span class="tag">${lvl(me.points)}</span></p>${user ? `<p class="save-status">Conta conectada: ${escapeHtml(user.email || "")}. Seu progresso é sincronizado.</p>` : `<p>Entre ou cadastre-se para jogar e salvar seu progresso na nuvem.</p><button onclick="openAuth('login')">Entrar ou criar conta</button>`}</div>
+ <div class="card"><h3>Pontuação</h3><p>Acerto: 100 pontos · bônus de velocidade até 50 (relâmpago) · cada 5 acertos seguidos: +100.</p><p>${Q.length + TF.length} perguntas disponíveis.</p></div>`;
+            else if (tab == "rank") rank()
+        }
+        function start(mode) {
+            let pool = mode == "tf" ? sh(TF).map(t => ["V/F", "f", t[0], ["Verdadeiro", "Falso"], t[1] ? 0 : 1, t[2], ""]) : sh(Q).slice(0, mode == "rush" ? 10 : 8);
+            S = {mode, pool, i: 0, pts: 0, ok: 0, streak: 0, sel: null, done: false, wrong: []}; ask()
+        }
+        function ask() {
+            const m = $("m"), q = S.pool[S.i]; S.sel = null; S.done = false; S.late = false; ts = Date.now();
+            m.innerHTML = `<div class="card"><div class="bar"><i style="width:${S.i / S.pool.length * 100}%"></i></div><p>${S.i + 1}/${S.pool.length} · <span class="tag">${q[0]}</span> <span id="t"></span></p><h3>${q[2]}</h3><div id="o">${q[3].map((o, k) => `<button class="opt" onclick="pick(${k})">${o}</button>`).join("")}</div><button id="c" onclick="conf()" disabled>Confirmar resposta</button><div id="e"></div></div>`;
+            clearInterval(tmr); if (S.mode == "rush") {let t = 15; $("t").textContent = "⏱ " + t; tmr = setInterval(() => {t--; $("t").textContent = "⏱ " + t; if (t <= 0) {clearInterval(tmr); S.late = true; $("t").textContent = "⏱ 0 · sem bônus"} }, 1000)}
+        }
+        function pick(k) {if (S.done) return; S.sel = k; document.querySelectorAll(".opt").forEach((b, j) => b.classList.toggle("sel", j == k)); $("c").disabled = false}
+        async function conf() {
+            if (S.done || S.sel === null) return; S.done = true; clearInterval(tmr); const q = S.pool[S.i], ok = S.sel == q[4]; let p = 0;
+            if (ok) {p = 100; S.ok++; S.streak++; if (S.mode == "rush") p += S.late ? 0 : Math.max(0, Math.round(50 - (Date.now() - ts) / 300)); if (S.streak % 5 == 0) p += 100} else {S.streak = 0; S.wrong.push(q)}
+            S.pts += p;
+            // Cada resposta confirmada é registrada imediatamente para reduzir perda de progresso.
+            me.points += p; me.answered += 1; if (ok) me.correct += 1;
+            const saved = await save();
+            document.querySelectorAll(".opt").forEach((b, j) => {b.disabled = true; if (j == q[4]) b.classList.add("ok"); else if (j == S.sel) b.classList.add("bad")});
+            $("c").style.display = "none"; $("e").innerHTML = `<div class="ex"><b>${ok ? "Correto! +" + p : "Resposta incorreta."}</b><p>${q[5]}</p>${q[6] ? `<p>🔬 ${q[6]}</p>` : ""}${saved ? `<p class="save-status">✓ Progresso salvo na sua conta.</p>` : `<p class="save-status">⚠ Não foi possível confirmar o salvamento. Verifique sua conexão.</p>`}</div><p><button onclick="nx()">${S.i + 1 < S.pool.length ? "Próxima pergunta" : "Ver resultado"}</button></p>`
+        }
+        async function nx() {
+            S.i++; if (S.i < S.pool.length) return ask();
+            // As respostas já foram salvas individualmente em conf().
+            $("m").innerHTML = `<div class="card"><h2>Resultado</h2><p>${S.ok}/${S.pool.length} acertos · ${S.pts} pontos · ${lvl(me.points)}</p>${S.wrong.length ? "<h3>Para revisar</h3>" + S.wrong.map(q => `<p><b>${q[2]}</b><br>Resposta: ${q[3][q[4]]}</p>`).join("") : "<p>Sem erros!</p>"}<button onclick="go('${S.mode == "tf" ? "tf" : S.mode}')">Jogar novamente</button></div>`
+        }
+        async function save() {
+            if (!db || !uid) return false;
+            try {
+                const {error} = await db.from("player_progress").upsert({
+                    user_id: uid,
+                    display_name: me.display_name || user?.user_metadata?.full_name || "Jogador",
+                    points: me.points,
+                    answered: me.answered,
+                    correct: me.correct,
+                    favorites: me.fav,
+                    updated_at: new Date().toISOString()
+                }, {onConflict: "user_id"});
+                if (error) throw error;
+                return true;
+            } catch (e) { console.error("Erro ao salvar progresso:", e); return false; }
+        }
+        async function rank() {
+            const m = $("m"); m.innerHTML = '<div class="card">Carregando ranking...</div>';
+            if (!db) { m.innerHTML = '<div class="card">Configure o Supabase para ativar o ranking.</div>'; return; }
+            try {
+                const {data, error} = await db.from("leaderboard").select("user_id,display_name,points,answered,correct").order("points", {ascending:false}).limit(20);
+                if (error) throw error;
+                m.innerHTML = `<div class="card"><h2>Ranking geral</h2>${data.length ? `<table><tr><th>#</th><th>Jogador</th><th>Pontos</th><th>Acerto</th></tr>${data.map((r,i) => `<tr><td>${["🥇","🥈","🥉"][i] || i+1}</td><td>${escapeHtml(r.display_name || "Jogador")}</td><td>${Number(r.points)||0}</td><td>${r.answered ? Math.round(100*r.correct/r.answered) : 0}%</td></tr>`).join("")}</table>` : '<p>Ainda não há jogadores no ranking.</p>'}</div>`;
+            } catch (e) { console.error(e); m.innerHTML = '<div class="card">Não foi possível carregar o ranking. Confira a configuração e as permissões do Supabase.</div>'; }
+        }
+        function openAuth(mode = "login", message = "") {
+            authMode = mode; $("authModal").classList.add("show");
+            $("authName").style.display = mode === "signup" ? "block" : "none";
+            $("nameLabel").style.display = mode === "signup" ? "block" : "none";
+            $("authTitle").textContent = mode === "signup" ? "Criar sua conta" : "Entrar no BioLab Dynamics";
+            $("authIntro").textContent = mode === "signup" ? "Cadastre-se para guardar seu progresso e participar do ranking." : "Entre para continuar aprendendo e salvar seus resultados.";
+            $("authSubmit").textContent = mode === "signup" ? "Criar conta" : "Entrar";
+            $("authSwitch").textContent = mode === "signup" ? "Já tenho uma conta" : "Criar uma conta";
+            setAuthMessage(message);
+        }
+        function closeAuth() { $("authModal").classList.remove("show"); }
+        function setAuthMessage(message, good = false) { const el = $("authMessage"); el.textContent = message; el.className = "auth-message" + (good ? " good" : ""); }
+        $("authSwitch").addEventListener("click", () => openAuth(authMode === "login" ? "signup" : "login"));
+        $("authForm").addEventListener("submit", async (ev) => {
+            ev.preventDefault();
+            if (!db) { setAuthMessage("Antes, configure a URL e a chave pública do seu projeto Supabase no início do código."); return; }
+            const email = $("authEmail").value.trim(), password = $("authPassword").value;
+            const name = $("authName").value.trim();
+            $("authSubmit").disabled = true; setAuthMessage("Aguarde...");
+            try {
+                let result;
+                if (authMode === "signup") {
+                    result = await db.auth.signUp({email, password, options:{data:{full_name:name || "Jogador"}}});
+                    if (result.error) throw result.error;
+                    if (!result.data.session) { setAuthMessage("Cadastro realizado! Verifique seu e-mail para confirmar a conta e depois faça login.", true); return; }
+                } else {
+                    result = await db.auth.signInWithPassword({email, password});
+                    if (result.error) throw result.error;
+                }
+                setAuthMessage("Acesso realizado!", true);
+                await handleSession(result.data.session);
+                setTimeout(closeAuth, 500);
+            } catch (e) { setAuthMessage(e.message || "Não foi possível autenticar."); }
+            finally { $("authSubmit").disabled = false; }
+        });
+        async function loadProgress() {
+            if (!db || !uid) return;
+            const {data, error} = await db.from("player_progress").select("points,answered,correct,favorites,display_name").eq("user_id", uid).maybeSingle();
+            if (error) { console.error("Erro ao carregar progresso:", error); return; }
+            if (data) Object.assign(me, {points:data.points||0, answered:data.answered||0, correct:data.correct||0, fav:data.favorites||[], display_name:data.display_name || user?.user_metadata?.full_name || "Jogador"});
+            else { me.display_name = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Jogador"; await save(); }
+        }
+        async function handleSession(session) {
+            user = session?.user || null; uid = user?.id || null;
+            if (user) await loadProgress();
+            else { me = {points:0,answered:0,correct:0,fav:[],display_name:"Jogador"}; }
+            nav(); render();
+        }
+        async function logout() { if (db) { const {error} = await db.auth.signOut(); if (error) alert("Não foi possível sair: " + error.message); } }
+        (async () => {
+            nav(); render();
+            if (!window.supabase || !window.supabase.createClient) { console.error("Biblioteca Supabase não carregou."); return; }
+            if (SUPABASE_URL.startsWith("COLE_") || SUPABASE_ANON_KEY.startsWith("COLE_")) {
+                console.warn("Configure SUPABASE_URL e SUPABASE_ANON_KEY para ativar login e salvamento."); return;
+            }
+            db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            db.auth.onAuthStateChange((_event, session) => { setTimeout(() => handleSession(session), 0); });
+            const {data:{session}} = await db.auth.getSession();
+            await handleSession(session);
+        })();
+    </script>
+    <!-- Herbário Digital: precisa vir DEPOIS do script principal -->
+    <script src="herbario.js"></script>
+</body>
+
+</html>
